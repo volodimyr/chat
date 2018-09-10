@@ -37,7 +37,6 @@ func (cht *chat) start() {
 		select {
 		case conn := <-cht.NewConn:
 			if u, ok := cht.Users[conn.Name]; ok {
-				//add new connection for existing user
 				u.Clients[conn.Conn] = struct{}{}
 				//don't need to notify anybody as user has already opened at least one client
 				break
@@ -47,24 +46,12 @@ func (cht *chat) start() {
 				conn.Name,
 				map[net.Conn]struct{}{conn.Conn: {}},
 			}
-			//notify
-			go func() {
-				cht.Input <- message{
-					From: "server",
-					Text: fmt.Sprintf("%s online", conn.Name),
-				}
-			}()
+			go cht.notify("server", fmt.Sprintf("%s online", conn.Name))
 		case conn := <-cht.DiscardConn:
 			if len(cht.Users[conn.Name].Clients) == 1 {
 				//delete client, but keep user
 				delete(cht.Users, conn.Name)
-				//notify
-				go func() {
-					cht.Input <- message{
-						From: "server",
-						Text: fmt.Sprintf("%s offline", conn.Name),
-					}
-				}()
+				go cht.notify("server", fmt.Sprintf("%s offline", conn.Name))
 				break
 			}
 			//delete user if no clients alive
@@ -72,6 +59,13 @@ func (cht *chat) start() {
 		case msg := <-cht.Input:
 			cht.broadcastMessage(msg)
 		}
+	}
+}
+
+func (cht *chat) notify(from string, text string) {
+	cht.Input <- message{
+		From: from,
+		Text: text,
 	}
 }
 
